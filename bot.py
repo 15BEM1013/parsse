@@ -1,31 +1,32 @@
 import asyncio
+import threading
 import re
-from telethon import TelegramClient
-from telethon.events import NewMessage
-import telegram
+import requests
+import os
 from datetime import datetime
 import pytz
-import os
+import time
+from telethon import TelegramClient, events
 from flask import Flask
-import threading
+import telegram
 
 # Initialize Flask app
 app = Flask(__name__)
 
-# Telegram API credentials (set these in environment variables on Render)
+# Telegram API credentials
 API_ID = os.getenv('TELEGRAM_API_ID')
 API_HASH = os.getenv('TELEGRAM_API_HASH')
 BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
-CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')  # Your chat/channel ID
+CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 
-# Initialize Telethon client and Telegram Bot
+# Initialize clients
 client = TelegramClient('bot_session', API_ID, API_HASH)
 bot = telegram.Bot(token=BOT_TOKEN)
 
-# List of channels to monitor
+# Channels to monitor
 CHANNELS = ['cryptocapitalgl', 'Official_GCR', 'THE_WOLFREAL']
 
-# Regex patterns for parsing signals
+# Regex patterns
 PATTERNS = {
     'pair': r'(?:Coin|Pair)\s*[:\-]?\s*([A-Z0-9]+/[A-Z0-9]+)',
     'trade_type': r'(LONG|SHORT|BUY|SELL)',
@@ -36,7 +37,6 @@ PATTERNS = {
 }
 
 async def parse_signal(text):
-    """Parse signal text into structured data."""
     signal = {}
     for key, pattern in PATTERNS.items():
         match = re.search(pattern, text, re.IGNORECASE)
@@ -44,10 +44,8 @@ async def parse_signal(text):
     return signal
 
 async def format_signal_message(signal, original_text, timestamp):
-    """Format the parsed signal into a clean message."""
     ist = pytz.timezone('Asia/Kolkata')
     formatted_time = timestamp.astimezone(ist).strftime('%Y-%m-%d %H:%M:%S IST')
-    
     message = (
         f"📊 *New Trading Signal*\n\n"
         f"**Coin/Pair**: {signal['pair']}\n"
@@ -62,45 +60,34 @@ async def format_signal_message(signal, original_text, timestamp):
     return message
 
 async def send_to_chat(message):
-    """Send formatted message to the target chat/channel."""
     try:
         await bot.send_message(chat_id=CHAT_ID, text=message, parse_mode='Markdown')
     except Exception as e:
         print(f"Error sending message: {e}")
 
-@client.on(NewMessage(chats=CHANNELS))
+@client.on(events.NewMessage(chats=CHANNELS))
 async def handle_new_message(event):
-    """Handle new messages from monitored channels."""
     message = event.message
     text = message.text
     timestamp = message.date
-
-    # Parse the signal
     signal = await parse_signal(text)
-    
-    # Check if the message contains a trading signal
     if any(signal[key] != 'Not found' for key in ['pair', 'trade_type', 'entry']):
         formatted_message = await format_signal_message(signal, text, timestamp)
         await send_to_chat(formatted_message)
 
 async def start_bot():
-    """Start the Telegram bot."""
     await client.start(bot_token=BOT_TOKEN)
     print("Bot is running and listening for signals...")
     await client.run_until_disconnected()
 
 @app.route('/')
 def home():
-    """Flask endpoint to keep the service alive."""
     return "Crypto Signal Bot is running!"
 
 def run_flask():
-    """Run Flask server."""
     app.run(host='0.0.0.0', port=8080)
 
 if __name__ == '__main__':
-    # Start bot in a separate thread
     bot_thread = threading.Thread(target=lambda: asyncio.run(start_bot()))
     bot_thread.start()
-    # Run Flask server in the main thread
     run_flask()
