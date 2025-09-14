@@ -8,25 +8,21 @@ import pytz
 import time
 from telethon import TelegramClient, events
 from flask import Flask
-import telegram
+from telegram import Bot
+from telegram.constants import ParseMode
 
-# Initialize Flask app
 app = Flask(__name__)
 
-# Telegram API credentials
 API_ID = os.getenv('TELEGRAM_API_ID')
 API_HASH = os.getenv('TELEGRAM_API_HASH')
 BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 
-# Initialize clients
 client = TelegramClient('bot_session', API_ID, API_HASH)
-bot = telegram.Bot(token=BOT_TOKEN)
+bot = Bot(token=BOT_TOKEN)
 
-# Channels to monitor
 CHANNELS = ['cryptocapitalgl', 'Official_GCR', 'THE_WOLFREAL']
 
-# Regex patterns
 PATTERNS = {
     'pair': r'(?:Coin|Pair)\s*[:\-]?\s*([A-Z0-9]+/[A-Z0-9]+)',
     'trade_type': r'(LONG|SHORT|BUY|SELL)',
@@ -57,11 +53,12 @@ async def format_signal_message(signal, original_text, timestamp):
         f"**Original Message**:\n{original_text}\n\n"
         f"**Time**: {formatted_time}"
     )
+    message = message.replace('-', r'\-').replace('.', r'\.')
     return message
 
 async def send_to_chat(message):
     try:
-        await bot.send_message(chat_id=CHAT_ID, text=message, parse_mode='Markdown')
+        await bot.send_message(chat_id=CHAT_ID, text=message, parse_mode=ParseMode.MARKDOWN_V2)
     except Exception as e:
         print(f"Error sending message: {e}")
 
