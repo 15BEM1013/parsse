@@ -1,8 +1,4 @@
-telethon==1.36.0
-requests==2.32.3
-pytz==2025.1
-
-python-telegram-bot==13.7
-python-telegram-bot==13.7
+python-telegram-bot==13.7; python_version < '3.13'
 telethon==1.36.0
 flask==3.0.3
+pytz==2024.2
