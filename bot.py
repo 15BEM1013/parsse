@@ -1,19 +1,16 @@
 import asyncio
 import threading
 import re
-import requests
 import os
 from datetime import datetime
 import pytz
-import time
 from telethon import TelegramClient, events
 from flask import Flask
-import telegram
 
 # Initialize Flask app
 app = Flask(__name__)
 
-# Telegram API credentials
+# Telegram API credentials (from environment variables)
 API_ID = os.getenv('TELEGRAM_API_ID')
 API_HASH = os.getenv('TELEGRAM_API_HASH')
 BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
@@ -23,16 +20,15 @@ CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 if not all([API_ID, API_HASH, BOT_TOKEN, CHAT_ID]):
     raise ValueError("Missing required environment variables: TELEGRAM_API_ID, TELEGRAM_API_HASH, TELEGRAM_BOT_TOKEN, or TELEGRAM_CHAT_ID")
 
-# Initialize clients
+# Initialize Telethon client
 client = TelegramClient('bot_session', API_ID, API_HASH)
-bot = telegram.Bot(token=BOT_TOKEN)
 
 # Channels to monitor
 CHANNELS = ['cryptocapitalgl', 'Official_GCR', 'THE_WOLFREAL']
 
 # Regex patterns
 PATTERNS = {
-    'pair': r'(?:Coin|Pair)\s*[:\-]?\s*([A-Z0-9]+/[A-Z0-9]+)',
+    'pair': r'(?:Coin|Pair)\s*[:\-]?\s*([A-Z0-9]+/?[A-Z0-9]+)',
     'trade_type': r'(LONG|SHORT|BUY|SELL)',
     'leverage': r'(?:Leverage|Lev)\s*[:\-]?\s*(\d+x)',
     'entry': r'(?:Entry|Buy at|Enter at)\s*[:\-]?\s*([\d.]+(?:\s*-\s*[\d.]+)?)',
@@ -65,7 +61,7 @@ async def format_signal_message(signal, original_text, timestamp):
 
 async def send_to_chat(message):
     try:
-        await bot.send_message(chat_id=CHAT_ID, text=message, parse_mode='Markdown')
+        await client.send_message(CHAT_ID, message, parse_mode='markdown')
     except Exception as e:
         print(f"Error sending message: {e}")
 
@@ -89,7 +85,7 @@ def home():
     return "Crypto Signal Bot is running!"
 
 def run_flask():
-    app.run(host='0.0.0.0', port=8080)
+    app.run(host='0.0.0.0', port=int(os.getenv('PORT', 5000)))
 
 if __name__ == '__main__':
     bot_thread = threading.Thread(target=lambda: asyncio.run(start_bot()))
